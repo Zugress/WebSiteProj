@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Обратная связь - Новостной Блог{% endblock %}
+
+{% block content %}
+<div class="content-page">
+    <h1>Обратная связь</h1>
+    <p>Пожалуйста, заполните форму ниже:</p>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="alert alert-success">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('feedback') }}">
+        <div class="mb-3">
+            <label for="name" class="form-label">Имя *</label>
+            <input type="text" class="form-control {% if error and error.name %}is-invalid{% endif %}" 
+                   id="name" name="name" value="{{ form_data.name if form_data }}" required>
+            {% if error and error.name %}
+                <div class="invalid-feedback">{{ error.name }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="email" class="form-label">Email *</label>
+            <input type="email" class="form-control {% if error and error.email %}is-invalid{% endif %}" 
+                   id="email" name="email" value="{{ form_data.email if form_data }}" required>
+            {% if error and error.email %}
+                <div class="invalid-feedback">{{ error.email }}</div>
+            {% endif %}
+        </div>
+
+        <div class="mb-3">
+            <label for="message" class="form-label">Сообщение *</label>
+            <textarea class="form-control {% if error and error.message %}is-invalid{% endif %}" 
+                      id="message" name="message" rows="5" required>{{ form_data.message if form_data }}</textarea>
+            {% if error and error.message %}
+                <div class="invalid-feedback">{{ error.message }}</div>
+            {% endif %}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Отправить</button>
+    </form>
+
+    {% if submitted_data %}
+    <div class="mt-5">
+        <h3>Данные формы:</h3>
+        <div class="card">
+            <div class="card-body">
+                <p><strong>Имя:</strong> {{ submitted_data.name }}</p>
+                <p><strong>Email:</strong> {{ submitted_data.email }}</p>
+                <p><strong>Сообщение:</strong> {{ submitted_data.message }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
