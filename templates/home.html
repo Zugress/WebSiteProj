@@ -42,7 +42,12 @@
             {% for article in articles %}
             <a href="/news/{{ article.id }}" class="list-group-item list-group-item-action">
                 <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ article.title }}</h5>
+                    <h5 class="mb-1">
+                        {{ article.title }}
+                        {% if article.is_today %}
+                            <span class="badge bg-danger">Новое!</span>
+                        {% endif %}
+                    </h5>
                     <small>{{ article.date.strftime('%d.%m.%Y') }}</small>
                 </div>
             </a>
@@ -51,5 +56,6 @@
     {% else %}
         <p>Статей пока нет.</p>
     {% endif %}
+</div>
 </div>
 {% endblock %}

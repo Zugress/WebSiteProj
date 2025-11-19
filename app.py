@@ -16,7 +16,11 @@ def home():
         {'id': 5, 'title': 'ПОСЛЕДНЯЯ - ПЯТАЯ СТАТЬЯ', 'date': (datetime.now() - timedelta(days=2)).date()}
     ]
     
-    return render_template('home.html', articles=articles)
+    today = datetime.now().date()
+    for article in articles:
+        article['is_today'] = article['date'] == today
+    
+    return render_template('home.html', articles=articles, today=today)
 
 @app.route('/about')
 def about():
