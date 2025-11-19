@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, flash, redirect, url_for
 import re
 
 app = Flask(__name__)
-app.secret_key = 'djjjjejejej1929731293' #для flash сообщений
+app.secret_key = 'djjjjejejej1929731293' #только для flash сообщений 
 
 @app.route('/')
 def home():
@@ -50,6 +50,10 @@ def feedback():
         return render_template('feedback.html', submitted_data=form_data)
     
     return render_template('feedback.html')
+
+@app.route('/news/<int:id>')
+def news_detail(id):
+    return f"Статья {id}"
 
 if __name__ == '__main__':
     app.run(debug=True)
