@@ -34,4 +34,22 @@
         </div>
     </div>
 </div>
+<div class="mt-5">
+    <h2>Последние статьи</h2>
+    
+    {% if articles %}
+        <div class="list-group mt-3">
+            {% for article in articles %}
+            <a href="/news/{{ article.id }}" class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between">
+                    <h5 class="mb-1">{{ article.title }}</h5>
+                    <small>{{ article.date.strftime('%d.%m.%Y') }}</small>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>Статей пока нет.</p>
+    {% endif %}
+</div>
 {% endblock %}

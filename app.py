@@ -1,12 +1,22 @@
 from flask import Flask, render_template, request, flash, redirect, url_for
 import re
+from datetime import datetime, timedelta
+
 
 app = Flask(__name__)
 app.secret_key = 'djjjjejejej1929731293' #только для flash сообщений 
 
 @app.route('/')
 def home():
-    return render_template('home.html')
+    articles = [
+        {'id': 1, 'title': 'ЗАГОЛОВОК СТАТЬИ НОМЕР ОДИН', 'date': datetime.now().date()},
+        {'id': 2, 'title': 'ЗАГОЛОВОК ДЛЯ ВТОРОЙ СТАТЬИ НА САЙТЕ', 'date': (datetime.now() - timedelta(days=1)).date()},
+        {'id': 3, 'title': 'ТРЕТИЙ ЗАГОЛОВОК ДЛЯ СТАТЬИ', 'date': datetime.now().date()},
+        {'id': 4, 'title': 'СТАТЬЯ НОМЕР ЧЕТЫРЕ И ЕЕ ЗАГОЛОВОК', 'date': (datetime.now() - timedelta(days=3)).date()},
+        {'id': 5, 'title': 'ПОСЛЕДНЯЯ - ПЯТАЯ СТАТЬЯ', 'date': (datetime.now() - timedelta(days=2)).date()}
+    ]
+    
+    return render_template('home.html', articles=articles)
 
 @app.route('/about')
 def about():
