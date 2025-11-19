@@ -1,18 +1,18 @@
-from flask import Flask
+from flask import Flask, render_template
 
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return 'Добро пожаловать в Новостной Блог!'
+    return render_template('home.html')
 
 @app.route('/about')
 def about():
-    return 'О проекте: Это новостной блог с последними статьями и событиями.'
+    return render_template('about.html')
 
 @app.route('/contact')
 def contact():
-    return 'Контакты: Email - abcde@newsblog.com, Телефон - +7 123 456 78 90'
+    return render_template('contact.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
