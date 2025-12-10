@@ -30,7 +30,7 @@
         <div class="mb-3">
             <label for="email" class="form-label">Email *</label>
             <input type="email" class="form-control {% if error and error.email %}is-invalid{% endif %}" 
-                   id="email" name="email" value="{{ form_data.email if form_data }}" required>
+                   id="email" name="email" value="{{ form_data.email if form_data }}" requiredpy>
             {% if error and error.email %}
                 <div class="invalid-feedback">{{ error.email }}</div>
             {% endif %}

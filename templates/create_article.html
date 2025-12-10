@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Создать статью - Новостной Блог{% endblock %}
+
+{% block content %}
+<div class="content-page">
+    <h1>Создать новую статью</h1>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <form method="POST" action="{{ url_for('create_article') }}">
+        <div class="mb-3">
+            <label for="title" class="form-label">Заголовок *</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+        </div>
+        
+        <div class="mb-3">
+            <label for="text" class="form-label">Текст статьи *</label>
+            <textarea class="form-control" id="text" name="text" rows="10" required></textarea>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Создать статью</button>
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

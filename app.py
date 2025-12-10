@@ -125,6 +125,38 @@ def create_article():
     
     return render_template('create_article.html')
 
+
+@app.route('/edit-article/<int:id>', methods=['GET', 'POST'])
+def edit_article(id):
+    article = Article.query.get_or_404(id)
+    
+    if request.method == 'POST':
+
+        article.title = request.form.get('title', '').strip()
+        article.text = request.form.get('text', '').strip()
+        
+        if not article.title or not article.text:
+            flash('Заполните все поля', 'danger')
+            return render_template('edit_article.html', article=article)
+        
+        db.session.commit()
+        
+        flash('Статья успешно обновлена', 'success')
+        return redirect(url_for('article_detail', id=article.id))
+    
+    return render_template('edit_article.html', article=article)
+
+@app.route('/delete-article/<int:id>', methods=['POST'])
+def delete_article(id):
+    article = Article.query.get_or_404(id)
+    
+    db.session.delete(article)
+    db.session.commit()
+    
+    flash('СТАТЬЯ УСПЕШНО УНИЧТОЖЕНАААА', 'success')
+    return redirect(url_for('articles_list'))
+
+
 @app.route('/articles')
 def articles_list():
     articles = Article.query.order_by(Article.created_date.desc()).all()
