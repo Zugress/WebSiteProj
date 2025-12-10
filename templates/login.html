@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Вход - Новостной Блог{% endblock %}
+
+{% block content %}
+<div class="content-page">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <h1 class="text-center">Вход в аккаунт</h1>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <form method="POST" action="{{ url_for('login') }}">
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email *</label>
+                    <input type="email" class="form-control {% if error and error.email %}is-invalid{% endif %}" 
+                           id="email" name="email" value="{{ form_data.email if form_data else '' }}" required>
+                    {% if error and error.email %}
+                        <div class="invalid-feedback">{{ error.email }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">Пароль *</label>
+                    <input type="password" class="form-control {% if error and error.password %}is-invalid{% endif %}" 
+                           id="password" name="password" required>
+                    {% if error and error.password %}
+                        <div class="invalid-feedback">{{ error.password }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Войти</button>
+                    <a href="{{ url_for('register') }}" class="btn btn-link">Нет аккаунта? Зарегистрироваться</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -2,10 +2,13 @@ from flask import Flask, render_template, request, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import re
-
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import session
+import secrets
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'djjjjejejej1929731293' #только для flash сообщений 
+app.secret_key = secrets.token_hex(16)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -44,8 +47,17 @@ class User(db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     hashed_password = db.Column(db.String(200), nullable=False)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-
+    
     articles = db.relationship('Article', backref='author', lazy=True)
+    
+    def set_password(self, password):
+        self.hashed_password = generate_password_hash(password)
+    
+    def check_password(self, password):
+        return check_password_hash(self.hashed_password, password)
+    
+    def __repr__(self):
+        return f'<User {self.name}>'
 
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -70,6 +82,14 @@ class Comment(db.Model):
     def __repr__(self):
         return f'<Comment {self.text[:20]}...>'
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Пожалуйста, войдите в систему чтобы получить доступ к этой странице', 'danger')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/about')
 def about():
@@ -120,6 +140,7 @@ def article_detail(id):
     return render_template('article_detail.html', article=article)
 
 @app.route('/create-article', methods=['GET', 'POST'])
+@login_required
 def create_article():
     if request.method == 'POST':
 
@@ -154,6 +175,7 @@ def create_article():
 
 
 @app.route('/edit-article/<int:id>', methods=['GET', 'POST'])
+@login_required
 def edit_article(id):
     article = Article.query.get_or_404(id)
     
@@ -241,6 +263,89 @@ def add_comment(article_id):
     
     return render_template('add_comment.html', article=article)
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+        
+        errors = {}
+        form_data = {'name': name, 'email': email}
+        
+        if not name:
+            errors['name'] = 'Имя обязательно для заполнения'
+        elif len(name) < 2:
+            errors['name'] = 'Имя должно содержать хотя бы 2 символа'
+        
+        if not email:
+            errors['email'] = 'Email обязателен для заполнения'
+        elif User.query.filter_by(email=email).first():
+            errors['email'] = 'Пользователь с таким email уже существует'
+        
+        if not password:
+            errors['password'] = 'Пароль обязателен для заполнения'
+        elif len(password) < 6:
+            errors['password'] = 'Пароль должен содержать хотя бы 6 символов'
+        
+        if not confirm_password:
+            errors['confirm_password'] = 'Подтверждение пароля обязательно'
+        elif password != confirm_password:
+            errors['confirm_password'] = 'Пароли не совпадают'
+        
+        if errors:
+            return render_template('register.html', errors=errors, form_data=form_data)
+        
+        new_user = User(name=name, email=email)
+        new_user.set_password(password)
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        flash('Регистрация успешна! Теперь вы можете войти.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        errors = {}
+        form_data = {'email': email}
+        
+        if not email:
+            errors['email'] = 'Email обязателен для заполнения'
+        
+        if not password:
+            errors['password'] = 'Пароль обязателен для заполнения'
+        
+        if errors:
+            return render_template('login.html', errors=errors, form_data=form_data)
+        
+        user = User.query.filter_by(email=email).first()
+        
+        if not user or not user.check_password(password):
+            flash('Неверный email или пароль', 'danger')
+            return render_template('login.html', form_data=form_data)
+        
+        session['user_id'] = user.id
+        session['user_name'] = user.name
+        
+        flash(f'Добро пожаловать, {user.name}!', 'success')
+        return redirect(url_for('home'))
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Вы успешно вышли из системы', 'success')
+    return redirect(url_for('home'))
+
 def get_category_name(category):
     category_names = {
         'general': 'Общее',
@@ -259,14 +364,11 @@ with app.app_context():
     db.create_all()
     
     if not User.query.first():
-        test_user = User(
-            name='Первый пользователь',
-            email='tester@dvfu.ru',
-            hashed_password='password123'
-        )
+        test_user = User(name='Первый пользователь', email='tester@dvfu.ru')
+        test_user.set_password('password123')
         db.session.add(test_user)
         db.session.commit()
-        print("Создан тестовый пользователь")
+        print("Создан тестовый пользователь: tester@dvfu.ru / password123")
 
 if __name__ == '__main__':
     app.run(debug=True)
