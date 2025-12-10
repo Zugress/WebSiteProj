@@ -14,6 +14,7 @@ app.secret_key = secrets.token_hex(16)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.json.ensure_ascii = False
 
 db = SQLAlchemy(app)
 
@@ -435,5 +436,158 @@ def api_get_article(id):
     })
 
 
+@app.route('/api/articles', methods=['POST'])
+def api_create_article():
+    """POST /api/articles — создать статью через API"""
+    
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    
+    errors = []
+    
+    if not data.get('title'):
+        errors.append('Поле "title" обязательно')
+    elif len(data['title']) < 3:
+        errors.append('Заголовок должен содержать минимум 3 символа')
+    
+    if not data.get('text'):
+        errors.append('Поле "text" обязательно')
+    elif len(data['text']) < 10:
+        errors.append('Текст должен содержать минимум 10 символов')
+    
+    category = data.get('category', 'general')
+    valid_categories = ['general', 'technology', 'science', 'sports', 
+                       'entertainment', 'politics', 'business', 'health']
+    if category not in valid_categories:
+        category = 'general'
+    
+    if errors:
+        return jsonify({
+            'success': False,
+            'errors': errors
+        }), 400
+    
+    user = User.query.first()
+    if not user:
+        return jsonify({
+            'success': False,
+            'error': 'Нет пользователей в системе'
+        }), 400
+    
+    new_article = Article(
+        title=data['title'],
+        text=data['text'],
+        category=category,
+        user_id=user.id
+    )
+    
+    db.session.add(new_article)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Статья успешно создана',
+        'article': {
+            'id': new_article.id,
+            'title': new_article.title,
+            'category': new_article.category,
+            'created_date': new_article.created_date.isoformat()
+        }
+    }), 201  
+
+
+@app.route('/api/articles/<int:id>', methods=['PUT'])
+def api_update_article(id):
+    """PUT /api/articles/<id> — обновить статью через API"""
+    
+    article = Article.query.get(id)
+    if not article:
+        return jsonify({
+            'success': False,
+            'error': f'Статья с ID {id} не найдена'
+        }), 404
+    
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    
+    errors = []
+    
+    if 'title' in data:
+        if len(data['title']) < 3:
+            errors.append('Заголовок должен содержать минимум 3 символа')
+        else:
+            article.title = data['title']
+    
+    if 'text' in data:
+        if len(data['text']) < 10:
+            errors.append('Текст должен содержать минимум 10 символов')
+        else:
+            article.text = data['text']
+    
+    if 'category' in data:
+        valid_categories = ['general', 'technology', 'science', 'sports', 
+                           'entertainment', 'politics', 'business', 'health']
+        if data['category'] in valid_categories:
+            article.category = data['category']
+        else:
+            errors.append('Некорректная категория')
+    
+    if errors:
+        return jsonify({
+            'success': False,
+            'errors': errors
+        }), 400
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Статья успешно обновлена',
+        'article': {
+            'id': article.id,
+            'title': article.title,
+            'text': article.text[:100] + '...',
+            'category': article.category,
+            'updated': True
+        }
+    })
+    
+    
+    
+@app.route('/api/articles/<int:id>', methods=['DELETE'])
+def api_delete_article(id):
+    """DELETE /api/articles/<id> — удалить статью через API"""
+    
+    article = Article.query.get(id)
+    if not article:
+        return jsonify({
+            'success': False,
+            'error': f'Статья с ID {id} не найдена'
+        }), 404
+    
+    article_data = {
+        'id': article.id,
+        'title': article.title
+    }
+    
+    db.session.delete(article)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Статья успешно удалена',
+        'deleted_article': article_data
+    })
+    
 if __name__ == '__main__':
     app.run(debug=True)
