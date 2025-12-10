@@ -4,31 +4,26 @@ import json
 BASE_URL = "http://localhost:5000/api"
 
 
-# print("=========1 Создаем статью:=========")
-# response = requests.post(f"{BASE_URL}/articles", json={
-#     "title": "TESTOVAYA STATIA",
-#     "text": "THI IS TESTOVAYA FOR TEST TEST 1 JUST CREATED",
-#     "category": "technology"
-# })
-# print(json.dumps(response.json(), indent=2))
+# ===========================================================
+
+4.1
+curl "http://localhost:5000/api/articles"
+curl "http://localhost:5000/api/articles/5"
+
+4.2
+curl -X POST "http://localhost:5000/api/articles" -H "Content-Type: application/json" -d '{"title": "DEMO CREATE ARTICLE", "text": "JUST CREATED ARTICLE", "category": "technology"}'
+curl -X PUT "http://localhost:5000/api/articles/7" -H "Content-Type: application/json" -d '{"title": "UPDATED UPDATED UPDATED", "text": "ARTICLE IS UPDATED NOW"}'
+curl -X DELETE "http://localhost:5000/api/articles/7"
+
+4.3
+curl "http://localhost:5000/api/articles/category/technology"
+curl "http://localhost:5000/api/articles?category=technology"
+curl "http://localhost:5000/api/articles?sort=date"
+curl "http://localhost:5000/api/articles?category=technology&sort=date&limit=2"
 
 
-# print("\n=========2 Получаем все статьи:=========")
-# response = requests.get(f"{BASE_URL}/articles")
-# data = response.json()
-# print(f"Найдено статей: {data['count']}")
-
-
-# if data['count'] > 0:
-#     article_id = data['articles'][0]['id']
-#     print(f"\n=========3 Обновляем статью ID={article_id}:=========")
-#     response = requests.put(f"{BASE_URL}/articles/{article_id}", json={
-#         "title": "UPDATED STATYA",
-#         "text": "TEST OF THE UPDATE STATYA"
-#     })
-#     print(json.dumps(response.json(), indent=2))
-
-# article_id = 8
-# print("=========4 Удаляем статью:=========")
-# response = requests.delete(f"{BASE_URL}/articles/{article_id}")
-# print(json.dumps(response.json(), indent=2))
+4.4
+curl "http://localhost:5000/api/comments"
+curl -X POST "http://localhost:5000/api/comments" -H "Content-Type: application/json" -d '{"text": "JUST CREATED COMMENT", "author_name": "bot", "article_id": 6}'
+curl "http://localhost:5000/api/comments/1"
+curl -X DELETE "http://localhost:5000/api/comments/1"

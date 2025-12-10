@@ -69,7 +69,7 @@ class Article(db.Model):
     category = db.Column(db.String(50), default='general')
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
+
     def __repr__(self):
         return f'<Article {self.title}>'
 
@@ -78,9 +78,9 @@ class Comment(db.Model):
     text = db.Column(db.Text, nullable=False)
     author_name = db.Column(db.String(100), nullable=False)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
     article_id = db.Column(db.Integer, db.ForeignKey('article.id'), nullable=False)
-    article = db.relationship('Article', backref=db.backref('comments', lazy=True))
+    
+    article = db.relationship('Article', backref=db.backref('comments', lazy=True, cascade='all, delete-orphan'))
     
     def __repr__(self):
         return f'<Comment {self.text[:20]}...>'
@@ -376,7 +376,40 @@ with app.app_context():
 # API МАРШРУТЫ
 @app.route('/api/articles', methods=['GET'])
 def api_get_articles():
-    articles = Article.query.order_by(Article.created_date.desc()).all()
+    """GET /api/articles список всех статей с фильтрацией и сортировкой"""
+    
+    category = request.args.get('category')
+    sort_by = request.args.get('sort', 'date')  
+    limit = request.args.get('limit', type=int)  
+    
+    query = Article.query
+    
+    if category:
+        valid_categories = ['general', 'technology', 'science', 'sports', 'entertainment', 'politics', 'business', 'health']
+        if category in valid_categories:
+            query = query.filter_by(category=category)
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Категория "{category}" не найдена. Доступные: {", ".join(valid_categories)}'
+            }), 400
+    
+    if sort_by == 'date':
+        query = query.order_by(Article.created_date.desc())  
+    elif sort_by == 'date_asc':
+        query = query.order_by(Article.created_date.asc())   
+    elif sort_by == 'title':
+        query = query.order_by(Article.title.asc())          
+    else:
+        return jsonify({
+            'success': False,
+            'error': f'Неправильный параметр сортировки. Доступные: date, date_asc, title'
+        }), 400
+    
+    if limit and limit > 0:
+        query = query.limit(limit)
+    
+    articles = query.all()
     
     articles_list = []
     for article in articles:
@@ -385,11 +418,11 @@ def api_get_articles():
             'title': article.title,
             'text': article.text[:200] + '...' if len(article.text) > 200 else article.text,
             'category': article.category,
+            'category_name': get_category_name(article.category),
             'created_date': article.created_date.isoformat(),
             'author': {
                 'id': article.author.id,
-                'name': article.author.name,
-                'email': article.author.email
+                'name': article.author.name
             },
             'comments_count': len(article.comments)
         })
@@ -397,6 +430,11 @@ def api_get_articles():
     return jsonify({
         'success': True,
         'count': len(articles_list),
+        'filters': {
+            'category': category if category else 'all',
+            'sort_by': sort_by,
+            'limit': limit if limit else 'none'
+        },
         'articles': articles_list
     })
 
@@ -438,7 +476,7 @@ def api_get_article(id):
 
 @app.route('/api/articles', methods=['POST'])
 def api_create_article():
-    """POST /api/articles — создать статью через API"""
+    """POST /api/articles создать статью через API"""
     
     if not request.is_json:
         return jsonify({
@@ -503,7 +541,7 @@ def api_create_article():
 
 @app.route('/api/articles/<int:id>', methods=['PUT'])
 def api_update_article(id):
-    """PUT /api/articles/<id> — обновить статью через API"""
+    """PUT /api/articles/<id> обновить статью через API"""
     
     article = Article.query.get(id)
     if not article:
@@ -561,12 +599,45 @@ def api_update_article(id):
             'updated': True
         }
     })
+
+@app.route('/api/articles/category/<category>', methods=['GET'])
+def api_get_articles_by_category(category):
+    """GET /api/articles/category/<category> фильтр по категории"""
     
+    valid_categories = ['general', 'technology', 'science', 'sports', 'entertainment', 'politics', 'business', 'health']
     
+    if category not in valid_categories:
+        return jsonify({
+            'success': False,
+            'error': f'Категория "{category}" не найдена',
+            'available_categories': valid_categories
+        }), 404
+    
+    articles = Article.query.filter_by(category=category)\
+               .order_by(Article.created_date.desc()).all()
+    
+    articles_list = []
+    for article in articles:
+        articles_list.append({
+            'id': article.id,
+            'title': article.title,
+            'text': article.text[:150] + '...',
+            'category': article.category,
+            'created_date': article.created_date.isoformat(),
+            'author_name': article.author.name
+        })
+    
+    return jsonify({
+        'success': True,
+        'category': category,
+        'category_name': get_category_name(category),
+        'count': len(articles_list),
+        'articles': articles_list
+    })
     
 @app.route('/api/articles/<int:id>', methods=['DELETE'])
 def api_delete_article(id):
-    """DELETE /api/articles/<id> — удалить статью через API"""
+    """DELETE /api/articles/<id> удалить статью через API"""
     
     article = Article.query.get(id)
     if not article:
@@ -587,6 +658,214 @@ def api_delete_article(id):
         'success': True,
         'message': 'Статья успешно удалена',
         'deleted_article': article_data
+    })
+    
+@app.route('/api/comments', methods=['GET'])
+def api_get_comments():
+    """GET /api/comments список всех комментариев"""
+    
+    article_id = request.args.get('article_id', type=int)
+    
+    query = Comment.query
+    
+    if article_id:
+        query = query.filter_by(article_id=article_id)
+    
+    query = query.order_by(Comment.created_date.desc())
+    
+    comments = query.all()
+    
+    comments_list = []
+    for comment in comments:
+        comments_list.append({
+            'id': comment.id,
+            'text': comment.text,
+            'author_name': comment.author_name,
+            'created_date': comment.created_date.isoformat(),
+            'article': {
+                'id': comment.article.id,
+                'title': comment.article.title[:50] + '...'
+            }
+        })
+    
+    return jsonify({
+        'success': True,
+        'count': len(comments_list),
+        'filters': {
+            'article_id': article_id if article_id else 'all'
+        },
+        'comments': comments_list
+    })
+    
+@app.route('/api/comments/<int:id>', methods=['GET'])
+def api_get_comment(id):
+    """GET /api/comments/<id> комментарий по ID"""
+    
+    comment = Comment.query.get(id)
+    
+    if not comment:
+        return jsonify({
+            'success': False,
+            'error': f'Комментарий с ID {id} не найден'
+        }), 404
+    
+    comment_data = {
+        'id': comment.id,
+        'text': comment.text,
+        'author_name': comment.author_name,
+        'created_date': comment.created_date.isoformat(),
+        'article': {
+            'id': comment.article.id,
+            'title': comment.article.title,
+            'author': comment.article.author.name
+        }
+    }
+    
+    return jsonify({
+        'success': True,
+        'comment': comment_data
+    })
+    
+    
+@app.route('/api/comments', methods=['POST'])
+def api_create_comment():
+    """POST /api/comments создать комментарий с валидацией"""
+    
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    
+    errors = []
+    
+    if not data.get('text'):
+        errors.append('Поле "text" обязательно')
+    elif len(data['text']) < 3:
+        errors.append('Текст должен содержать минимум 3 символа')
+    elif len(data['text']) > 1000:
+        errors.append('Текст не должен превышать 1000 символов')
+    
+    if not data.get('author_name'):
+        errors.append('Поле "author_name" обязательно')
+    elif len(data['author_name']) < 2:
+        errors.append('Имя должно содержать минимум 2 символа')
+    
+    if not data.get('article_id'):
+        errors.append('Поле "article_id" обязательно')
+    else:
+        article = Article.query.get(data['article_id'])
+        if not article:
+            errors.append(f'Статья с ID {data["article_id"]} не найдена')
+    
+    if errors:
+        return jsonify({
+            'success': False,
+            'errors': errors
+        }), 400
+    
+    new_comment = Comment(
+        text=data['text'],
+        author_name=data['author_name'],
+        article_id=data['article_id']
+    )
+    
+    db.session.add(new_comment)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Комментарий успешно создан',
+        'comment': {
+            'id': new_comment.id,
+            'text': new_comment.text,
+            'author_name': new_comment.author_name,
+            'article_id': new_comment.article_id
+        }
+    }), 201
+    
+@app.route('/api/comments/<int:id>', methods=['PUT'])
+def api_update_comment(id):
+    """PUT /api/comments/<id> обновить комментарий с валидацией"""
+    
+    comment = Comment.query.get(id)
+    
+    if not comment:
+        return jsonify({
+            'success': False,
+            'error': f'Комментарий с ID {id} не найден'
+        }), 404
+    
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    
+    errors = []
+    
+    if 'text' in data:
+        if len(data['text']) < 3:
+            errors.append('Текст должен содержать минимум 3 символа')
+        elif len(data['text']) > 1000:
+            errors.append('Текст не должен превышать 1000 символов')
+        else:
+            comment.text = data['text']
+    
+    if 'author_name' in data:
+        if len(data['author_name']) < 2:
+            errors.append('Имя должно содержать минимум 2 символа')
+        else:
+            comment.author_name = data['author_name']
+    
+    if errors:
+        return jsonify({
+            'success': False,
+            'errors': errors
+        }), 400
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Комментарий успешно обновлен',
+        'comment': {
+            'id': comment.id,
+            'text': comment.text,
+            'author_name': comment.author_name
+        }
+    }), 200
+    
+    
+@app.route('/api/comments/<int:id>', methods=['DELETE'])
+def api_delete_comment(id):
+    """DELETE /api/comments/<id> удалить комментарий"""
+    
+    comment = Comment.query.get(id)
+    
+    if not comment:
+        return jsonify({
+            'success': False,
+            'error': f'Комментарий с ID {id} не найден'
+        }), 404
+    
+    comment_data = {
+        'id': comment.id,
+        'text': comment.text[:50] + '...',
+        'author_name': comment.author_name
+    }
+    
+    db.session.delete(comment)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Комментарий успешно удален',
+        'deleted_comment': comment_data
     })
     
 if __name__ == '__main__':
