@@ -6,6 +6,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
 import secrets
 from functools import wraps
+from flask import jsonify, abort
+
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
@@ -369,6 +371,69 @@ with app.app_context():
         db.session.add(test_user)
         db.session.commit()
         print("Создан тестовый пользователь: tester@dvfu.ru / password123")
+
+# API МАРШРУТЫ
+@app.route('/api/articles', methods=['GET'])
+def api_get_articles():
+    articles = Article.query.order_by(Article.created_date.desc()).all()
+    
+    articles_list = []
+    for article in articles:
+        articles_list.append({
+            'id': article.id,
+            'title': article.title,
+            'text': article.text[:200] + '...' if len(article.text) > 200 else article.text,
+            'category': article.category,
+            'created_date': article.created_date.isoformat(),
+            'author': {
+                'id': article.author.id,
+                'name': article.author.name,
+                'email': article.author.email
+            },
+            'comments_count': len(article.comments)
+        })
+    
+    return jsonify({
+        'success': True,
+        'count': len(articles_list),
+        'articles': articles_list
+    })
+
+
+@app.route('/api/articles/<int:id>', methods=['GET'])
+def api_get_article(id):
+    article = Article.query.get(id)
+    
+    if not article:
+        abort(404, description=f"Статья с ID {id} не найдена")
+    
+    article_data = {
+        'id': article.id,
+        'title': article.title,
+        'text': article.text,
+        'category': article.category,
+        'created_date': article.created_date.isoformat(),
+        'author': {
+            'id': article.author.id,
+            'name': article.author.name,
+            'email': article.author.email
+        },
+        'comments': [
+            {
+                'id': comment.id,
+                'text': comment.text,
+                'author_name': comment.author_name,
+                'created_date': comment.created_date.isoformat()
+            }
+            for comment in article.comments
+        ]
+    }
+    
+    return jsonify({
+        'success': True,
+        'article': article_data
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=True)
