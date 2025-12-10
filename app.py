@@ -28,6 +28,25 @@ def home():
     
     return render_template('home.html', articles=articles, today=today)
 
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    hashed_password = db.Column(db.String(200), nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+
+    articles = db.relationship('Article', backref='author', lazy=True)
+
+class Article(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    text = db.Column(db.Text, nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    def __repr__(self):
+        return f'<Article {self.title}>'
+
 @app.route('/about')
 def about():
     return render_template('about.html')
@@ -74,6 +93,19 @@ def feedback():
 @app.route('/news/<int:id>')
 def news_detail(id):
     return f"Статья {id}"
+
+with app.app_context():
+    db.create_all()
+    
+    if not User.query.first():
+        test_user = User(
+            name='Первый пользователь',
+            email='tester@dvfu.ru',
+            hashed_password='password123'
+        )
+        db.session.add(test_user)
+        db.session.commit()
+        print("Создан тестовый пользователь")
 
 if __name__ == '__main__':
     app.run(debug=True)
