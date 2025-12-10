@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить комментарий - Новостной Блог{% endblock %}
+
+{% block content %}
+<div class="content-page">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('home') }}">Главная</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('articles_list') }}">Все статьи</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('article_detail', id=article.id) }}">{{ article.title|truncate(30) }}</a></li>
+            <li class="breadcrumb-item active">Добавить комментарий</li>
+        </ol>
+    </nav>
+
+    <h1>Добавить комментарий к статье</h1>
+    <h4 class="text-muted">"{{ article.title }}"</h4>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    
+    <form method="POST" action="{{ url_for('add_comment', article_id=article.id) }}">
+        <div class="mb-3">
+            <label for="author_name" class="form-label">Ваше имя *</label>
+            <input type="text" class="form-control" id="author_name" name="author_name" 
+                   value="{{ form_data.author_name if form_data else '' }}" required>
+        </div>
+        
+        <div class="mb-3">
+            <label for="text" class="form-label">Комментарий *</label>
+            <textarea class="form-control" id="text" name="text" rows="5" required>{{ form_data.text if form_data else '' }}</textarea>
+            <div class="form-text">Максимум 1000 символов</div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Добавить комментарий</button>
+        <a href="{{ url_for('article_detail', id=article.id) }}" class="btn btn-secondary">Отмена</a>
+    </form>
+</div>
+{% endblock %}

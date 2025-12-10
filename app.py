@@ -58,6 +58,19 @@ class Article(db.Model):
     def __repr__(self):
         return f'<Article {self.title}>'
 
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    author_name = db.Column(db.String(100), nullable=False)
+    created_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    article_id = db.Column(db.Integer, db.ForeignKey('article.id'), nullable=False)
+    article = db.relationship('Article', backref=db.backref('comments', lazy=True))
+    
+    def __repr__(self):
+        return f'<Comment {self.text[:20]}...>'
+
+
 @app.route('/about')
 def about():
     return render_template('about.html')
@@ -189,6 +202,44 @@ def articles_by_category(category):
 .order_by(Article.created_date.desc()).all()
     
     return render_template('articles_by_category.html', articles=articles, category=category, category_name=get_category_name(category))
+
+@app.route('/article/<int:article_id>/add-comment', methods=['GET', 'POST'])
+def add_comment(article_id):
+    article = Article.query.get_or_404(article_id)
+    
+    if request.method == 'POST':
+        author_name = request.form.get('author_name', '').strip()
+        text = request.form.get('text', '').strip()
+        
+        errors = {}
+        form_data = {'author_name': author_name, 'text': text}
+        
+        if not author_name:
+            errors['author_name'] = 'Имя обязательно для заполнения'
+        elif len(author_name) < 2:
+            errors['author_name'] = 'Имя должно содержать хотя бы 2 символа'
+            
+        if not text:
+            errors['text'] = 'Текст комментария обязателен'
+        elif len(text) > 1000:
+            errors['text'] = 'Комментарий не должен превышать 1000 символов'
+        
+        if errors:
+            return render_template('add_comment.html', article=article, errors=errors, form_data=form_data)
+        
+        new_comment = Comment(
+            text=text,
+            author_name=author_name,
+            article_id=article.id
+        )
+        
+        db.session.add(new_comment)
+        db.session.commit()
+        
+        flash('Комментарий успешно добавлен!', 'success')
+        return redirect(url_for('article_detail', id=article.id))
+    
+    return render_template('add_comment.html', article=article)
 
 def get_category_name(category):
     category_names = {
