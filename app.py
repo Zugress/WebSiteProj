@@ -91,8 +91,44 @@ def feedback():
     return render_template('feedback.html')
 
 @app.route('/news/<int:id>')
-def news_detail(id):
-    return f"Статья {id}"
+def article_detail(id):
+    article = Article.query.get_or_404(id)
+    return render_template('article_detail.html', article=article)
+
+@app.route('/create-article', methods=['GET', 'POST'])
+def create_article():
+    if request.method == 'POST':
+        
+        title = request.form.get('title', '').strip()
+        text = request.form.get('text', '').strip()
+        
+        if not title or not text:
+            flash('Заполните все поля', 'danger')
+            return render_template('create_article.html')
+        
+        user = User.query.first()
+        if not user:
+            flash('Нет пользователей в базе', 'danger')
+            return render_template('create_article.html')
+        
+        new_article = Article(
+            title=title,
+            text=text,
+            user_id=user.id
+        )
+        
+        db.session.add(new_article)
+        db.session.commit()
+        
+        flash('Статья успешно создана', 'success')
+        return redirect(url_for('articles_list'))
+    
+    return render_template('create_article.html')
+
+@app.route('/articles')
+def articles_list():
+    articles = Article.query.order_by(Article.created_date.desc()).all()
+    return render_template('articles_list.html', articles=articles)
 
 with app.app_context():
     db.create_all()
