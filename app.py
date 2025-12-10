@@ -1,10 +1,16 @@
 from flask import Flask, render_template, request, flash, redirect, url_for
-import re
+from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
+import re
 
 
 app = Flask(__name__)
 app.secret_key = 'djjjjejejej1929731293' #только для flash сообщений 
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db = SQLAlchemy(app)
 
 @app.route('/')
 def home():
@@ -48,7 +54,7 @@ def feedback():
         if not email:
             errors['email'] = 'Email обязателен для заполнения'
         else:
-            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$' #проверка на верный вид email
+            email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$' #шаблон для email
             if not re.match(email_pattern, email):
                 errors['email'] = 'Введите корректный email адрес'
         
