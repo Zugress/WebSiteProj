@@ -12,19 +12,29 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+@app.context_processor
+def utility_processor():
+    def get_category_name(category):
+        category_names = {
+            'general': 'Общее',
+            'technology': 'Технологии', 
+            'science': 'Наука',
+            'sports': 'Спорт',
+            'entertainment': 'Развлечения',
+            'politics': 'Политика',
+            'business': 'Бизнес',
+            'health': 'Здоровье'
+        }
+        return category_names.get(category, 'Неизвестная категория')
+    return dict(get_category_name=get_category_name)
+
 @app.route('/')
 def home():
-    articles = [
-        {'id': 1, 'title': 'ЗАГОЛОВОК СТАТЬИ НОМЕР ОДИН', 'date': datetime.now().date()},
-        {'id': 2, 'title': 'ЗАГОЛОВОК ДЛЯ ВТОРОЙ СТАТЬИ НА САЙТЕ', 'date': (datetime.now() - timedelta(days=1)).date()},
-        {'id': 3, 'title': 'ТРЕТИЙ ЗАГОЛОВОК ДЛЯ СТАТЬИ', 'date': datetime.now().date()},
-        {'id': 4, 'title': 'СТАТЬЯ НОМЕР ЧЕТЫРЕ И ЕЕ ЗАГОЛОВОК', 'date': (datetime.now() - timedelta(days=3)).date()},
-        {'id': 5, 'title': 'ПОСЛЕДНЯЯ - ПЯТАЯ СТАТЬЯ', 'date': (datetime.now() - timedelta(days=2)).date()}
-    ]
+    articles = Article.query.order_by(Article.created_date.desc()).limit(5).all()
     
     today = datetime.now().date()
     for article in articles:
-        article['is_today'] = article['date'] == today
+        article.is_today = article.created_date.date() == today
     
     return render_template('home.html', articles=articles, today=today)
 
@@ -41,6 +51,7 @@ class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     text = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(50), default='general')
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     
@@ -85,7 +96,7 @@ def feedback():
         if errors:
             return render_template('feedback.html', error=errors, form_data=form_data)
         
-        flash('Спасибо! Ваше сообщение отправлено.')
+        flash('Спасибо ваше сообщение отправлено.')
         return render_template('feedback.html', submitted_data=form_data)
     
     return render_template('feedback.html')
@@ -98,10 +109,12 @@ def article_detail(id):
 @app.route('/create-article', methods=['GET', 'POST'])
 def create_article():
     if request.method == 'POST':
-        
+
         title = request.form.get('title', '').strip()
         text = request.form.get('text', '').strip()
+        category = request.form.get('category', 'general').strip()
         
+
         if not title or not text:
             flash('Заполните все поля', 'danger')
             return render_template('create_article.html')
@@ -114,6 +127,7 @@ def create_article():
         new_article = Article(
             title=title,
             text=text,
+            category=category,
             user_id=user.id
         )
         
@@ -131,12 +145,13 @@ def edit_article(id):
     article = Article.query.get_or_404(id)
     
     if request.method == 'POST':
-
+        
         article.title = request.form.get('title', '').strip()
         article.text = request.form.get('text', '').strip()
+        article.category = request.form.get('category', 'general').strip()  
         
         if not article.title or not article.text:
-            flash('Заполните все поля', 'danger')
+            flash('Заполните вс поля', 'danger')
             return render_template('edit_article.html', article=article)
         
         db.session.commit()
@@ -161,6 +176,33 @@ def delete_article(id):
 def articles_list():
     articles = Article.query.order_by(Article.created_date.desc()).all()
     return render_template('articles_list.html', articles=articles)
+
+@app.route('/articles/<category>')
+def articles_by_category(category):
+    valid_categories = ['general', 'technology', 'science', 'sports', 'entertainment', 'politics', 'business', 'health']
+    
+    if category not in valid_categories:
+        flash(f'Категория "{category}" не найдена', 'danger') # не успевает отобразиться, ну и ладно
+        return redirect(url_for('articles_list'))
+    
+    articles = Article.query.filter_by(category=category)\
+.order_by(Article.created_date.desc()).all()
+    
+    return render_template('articles_by_category.html', articles=articles, category=category, category_name=get_category_name(category))
+
+def get_category_name(category):
+    category_names = {
+        'general': 'Общее',
+        'technology': 'Технологии',
+        'science': 'Наука',
+        'sports': 'Спорт',
+        'entertainment': 'Развлечения',
+        'politics': 'Политика',
+        'business': 'Бизнес',
+        'health': 'Здоровье'
+    }
+    return category_names.get(category, 'Неизвестная категория')
+
 
 with app.app_context():
     db.create_all()

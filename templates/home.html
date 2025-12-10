@@ -40,21 +40,38 @@
     {% if articles %}
         <div class="list-group mt-3">
             {% for article in articles %}
-            <a href="/news/{{ article.id }}" class="list-group-item list-group-item-action">
+            <a href="{{ url_for('article_detail', id=article.id) }}" class="list-group-item list-group-item-action">
                 <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">
-                        {{ article.title }}
-                        {% if article.is_today %}
-                            <span class="badge bg-danger">Новое!</span>
-                        {% endif %}
-                    </h5>
-                    <small>{{ article.date.strftime('%d.%m.%Y') }}</small>
+                    <div>
+                        <h5 class="mb-1">
+                            {{ article.title }}
+                            {% if article.is_today %}
+                                <span class="badge bg-danger">Новое!</span>
+                            {% endif %}
+                        </h5>
+                        <small class="text-muted">
+                            <span class="badge bg-info">{{ get_category_name(article.category) }}</span>
+                            | Автор: {{ article.author.name }}
+                        </small>
+                    </div>
+                    <small>{{ article.created_date.strftime('%d.%m.%Y') }}</small>
                 </div>
+                <p class="mb-1 mt-2">{{ article.text[:150] }}...</p>
             </a>
             {% endfor %}
         </div>
+        
+        {% if articles|length >= 5 %}
+        <div class="text-center mt-3">
+            <a href="{{ url_for('articles_list') }}" class="btn btn-primary">Все статьи →</a>
+        </div>
+        {% endif %}
+        
     {% else %}
-        <p>Статей пока нет.</p>
+        <div class="alert alert-info">
+            Статей пока нет. 
+            <a href="{{ url_for('create_article') }}" class="alert-link">Создайте первую статью!</a>
+        </div>
     {% endif %}
 </div>
 </div>

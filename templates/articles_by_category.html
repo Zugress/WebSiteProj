@@ -1,25 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Все статьи - Новостной Блог{% endblock %}
+{% block title %}Статьи в категории "{{ category_name }}" - Новостной Блог{% endblock %}
 
 {% block content %}
 <div class="content-page">
-    <h1>Все статьи</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('home') }}">Главная</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('articles_list') }}">Все статьи</a></li>
+            <li class="breadcrumb-item active">{{ category_name }}</li>
+        </ol>
+    </nav>
     
-    <div class="mb-4">
-        <h5>Фильтр по категориям:</h5>
-        <div class="btn-group" role="group">
-            <a href="{{ url_for('articles_list') }}" class="btn btn-outline-primary">Все</a>
-            <a href="{{ url_for('articles_by_category', category='general') }}" class="btn btn-outline-primary">Общее</a>
-            <a href="{{ url_for('articles_by_category', category='technology') }}" class="btn btn-outline-primary">Технологии</a>
-            <a href="{{ url_for('articles_by_category', category='science') }}" class="btn btn-outline-primary">Наука</a>
-            <a href="{{ url_for('articles_by_category', category='sports') }}" class="btn btn-outline-primary">Спорт</a>
-            <a href="{{ url_for('articles_by_category', category='entertainment') }}" class="btn btn-outline-primary">Развлечения</a>
-            <a href="{{ url_for('articles_by_category', category='politics') }}" class="btn btn-outline-primary">Политика</a>
-            <a href="{{ url_for('articles_by_category', category='business') }}" class="btn btn-outline-primary">Бизнес</a>
-            <a href="{{ url_for('articles_by_category', category='health') }}" class="btn btn-outline-primary">Здоровье</a>
-        </div>
-    </div>
+    <h1>Статьи в категории: {{ category_name }}</h1>
     
     {% if articles %}
         <div class="list-group">
@@ -53,7 +46,8 @@
         </div>
     {% else %}
         <div class="alert alert-info">
-            Статей пока нет. <a href="{{ url_for('create_article') }}">Создайте первую статью!</a>
+            В категории "{{ category_name }}" пока нет статей. 
+            <a href="{{ url_for('create_article') }}">Создайте первую статью!</a>
         </div>
     {% endif %}
 </div>

@@ -25,7 +25,19 @@
             <label for="text" class="form-label">Текст статьи *</label>
             <textarea class="form-control" id="text" name="text" rows="10" required>{{ article.text }}</textarea>
         </div>
-        
+        <div class="mb-3">
+            <label for="category" class="form-label">Категория</label>
+            <select class="form-control" id="category" name="category">
+                <option value="general" {% if article.category == 'general' %}selected{% endif %}>Общее</option>
+                <option value="technology" {% if article.category == 'technology' %}selected{% endif %}>Технологии</option>
+                <option value="science" {% if article.category == 'science' %}selected{% endif %}>Наука</option>
+                <option value="sports" {% if article.category == 'sports' %}selected{% endif %}>Спорт</option>
+                <option value="entertainment" {% if article.category == 'entertainment' %}selected{% endif %}>Развлечения</option>
+                <option value="politics" {% if article.category == 'politics' %}selected{% endif %}>Политика</option>
+                <option value="business" {% if article.category == 'business' %}selected{% endif %}>Бизнес</option>
+                <option value="health" {% if article.category == 'health' %}selected{% endif %}>Здоровье</option>
+            </select>
+        </div>
         <button type="submit" class="btn btn-primary">Сохранить изменения</button>
         <a href="{{ url_for('article_detail', id=article.id) }}" class="btn btn-secondary">Отмена</a>
     </form>
