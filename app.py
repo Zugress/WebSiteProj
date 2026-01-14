@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, flash, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import re
+from jwt_auth import JWTManager, jwt_required, admin_required
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
 import secrets
@@ -16,6 +17,35 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.json.ensure_ascii = False
 
+# Middleware
+@app.before_request
+def check_jwt_for_api():
+    """Проверяет JWT токен для API маршрутов"""
+    if request.path.startswith('/api/'):
+        public_routes = ['/auth/login', '/auth/refresh', '/auth/register']
+        if request.path in public_routes:
+            return
+        
+        if request.method == 'GET' and ('/articles' in request.path or '/comments' in request.path):
+            return
+        
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'error': 'Authorization header is missing'}), 401
+        
+        try:
+            auth_token = auth_header.split(" ")[1]
+        except IndexError:
+            return jsonify({'error': 'Bearer token malformed'}), 401
+        
+        payload = JWTManager.verify_access_token(auth_token)
+        if not payload or 'error' in payload:
+            error_msg = payload.get('error') if payload and isinstance(payload, dict) else 'Invalid token'
+            return jsonify({'error': error_msg}), 401
+        
+        request.user_id = payload['user_id']
+        request.username = payload['username']
+        
 db = SQLAlchemy(app)
 
 @app.context_processor
@@ -51,6 +81,8 @@ class User(db.Model):
     hashed_password = db.Column(db.String(200), nullable=False)
     created_date = db.Column(db.DateTime, default=datetime.utcnow)
     
+    refresh_tokens = db.Column(db.Text, default='[]')
+    
     articles = db.relationship('Article', backref='author', lazy=True)
     
     def set_password(self, password):
@@ -59,8 +91,33 @@ class User(db.Model):
     def check_password(self, password):
         return check_password_hash(self.hashed_password, password)
     
+    def add_refresh_token(self, token):
+        import json
+        tokens = json.loads(self.refresh_tokens)
+        tokens.append(token)
+        self.refresh_tokens = json.dumps(tokens[-5:])
+    
+    def has_refresh_token(self, token):
+        import json
+        tokens = json.loads(self.refresh_tokens)
+        return token in tokens
+    
+    def remove_refresh_token(self, token):
+        import json
+        tokens = json.loads(self.refresh_tokens)
+        if token in tokens:
+            tokens.remove(token)
+            self.refresh_tokens = json.dumps(tokens)
+    
     def __repr__(self):
         return f'<User {self.name}>'
+    
+    @staticmethod
+    def authenticate(email, password):
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            return user
+        return None
 
 class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -475,6 +532,7 @@ def api_get_article(id):
 
 
 @app.route('/api/articles', methods=['POST'])
+@jwt_required
 def api_create_article():
     """POST /api/articles создать статью через API"""
     
@@ -510,12 +568,19 @@ def api_create_article():
             'errors': errors
         }), 400
     
-    user = User.query.first()
+    user_id = getattr(request, 'user_id', None)
+    if not user_id:
+        return jsonify({
+            'success': False,
+            'error': 'Пользователь не авторизован'
+        }), 401
+
+    user = User.query.get(user_id)
     if not user:
         return jsonify({
             'success': False,
-            'error': 'Нет пользователей в системе'
-        }), 400
+            'error': 'Пользователь не найден'
+        }), 404
     
     new_article = Article(
         title=data['title'],
@@ -540,6 +605,7 @@ def api_create_article():
 
 
 @app.route('/api/articles/<int:id>', methods=['PUT'])
+@jwt_required
 def api_update_article(id):
     """PUT /api/articles/<id> обновить статью через API"""
     
@@ -636,6 +702,7 @@ def api_get_articles_by_category(category):
     })
     
 @app.route('/api/articles/<int:id>', methods=['DELETE'])
+@jwt_required
 def api_delete_article(id):
     """DELETE /api/articles/<id> удалить статью через API"""
     
@@ -728,6 +795,7 @@ def api_get_comment(id):
     
     
 @app.route('/api/comments', methods=['POST'])
+@jwt_required
 def api_create_comment():
     """POST /api/comments создать комментарий с валидацией"""
     
@@ -787,6 +855,7 @@ def api_create_comment():
     }), 201
     
 @app.route('/api/comments/<int:id>', methods=['PUT'])
+@jwt_required
 def api_update_comment(id):
     """PUT /api/comments/<id> обновить комментарий с валидацией"""
     
@@ -842,6 +911,7 @@ def api_update_comment(id):
     
     
 @app.route('/api/comments/<int:id>', methods=['DELETE'])
+@jwt_required
 def api_delete_comment(id):
     """DELETE /api/comments/<id> удалить комментарий"""
     
@@ -867,6 +937,186 @@ def api_delete_comment(id):
         'message': 'Комментарий успешно удален',
         'deleted_comment': comment_data
     })
+    
+    
+@app.route('/auth/login', methods=['POST'])
+def auth_login():
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    email = data.get('email', '').strip()
+    password = data.get('password', '').strip()
+    
+    if not email or not password:
+        return jsonify({
+            'success': False,
+            'error': 'Email и пароль обязательны'
+        }), 400
+    
+    user = User.authenticate(email, password)
+    if not user:
+        return jsonify({
+            'success': False,
+            'error': 'Неверный email или пароль'
+        }), 401
+    
+    access_token = JWTManager.create_access_token(user.id, user.name)
+    refresh_token = JWTManager.create_refresh_token(user.id, user.name)
+    
+    user.add_refresh_token(refresh_token)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+        'token_type': 'bearer',
+        'expires_in': 900,  
+        'user': {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email
+        }
+    }), 200
+
+@app.route('/auth/refresh', methods=['POST'])
+def auth_refresh():
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    refresh_token = data.get('refresh_token', '').strip()
+    
+    if not refresh_token:
+        return jsonify({
+            'success': False,
+            'error': 'Refresh токен обязателен'
+        }), 400
+    
+    payload = JWTManager.verify_refresh_token(refresh_token)
+    if not payload:
+        return jsonify({
+            'success': False,
+            'error': 'Невалидный или истекший refresh токен'
+        }), 401
+    
+    user = User.query.get(payload['user_id'])
+    if not user or not user.has_refresh_token(refresh_token):
+        return jsonify({
+            'success': False,
+            'error': 'Refresh токен не найден'
+        }), 401
+    
+    new_access_token = JWTManager.create_access_token(user.id, user.name)
+    
+    return jsonify({
+        'success': True,
+        'access_token': new_access_token,
+        'token_type': 'bearer',
+        'expires_in': 900
+    }), 200
+
+@app.route('/auth/logout', methods=['POST'])
+def auth_logout():
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    refresh_token = data.get('refresh_token', '').strip()
+    
+    if not refresh_token:
+        return jsonify({
+            'success': False,
+            'error': 'Refresh токен обязателен'
+        }), 400
+    
+    payload = JWTManager.verify_refresh_token(refresh_token)
+    if payload:
+        user = User.query.get(payload['user_id'])
+        if user:
+            user.remove_refresh_token(refresh_token)
+            db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Успешный выход из системы'
+    }), 200
+    
+    
+@app.route('/auth/register', methods=['POST'])
+def auth_register():
+    """Регистрация нового пользователя через API"""
+    if not request.is_json:
+        return jsonify({
+            'success': False,
+            'error': 'Content-Type должен быть application/json'
+        }), 400
+    
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip()
+    password = data.get('password', '').strip()
+    
+    errors = []
+    
+    if not name:
+        errors.append('Имя обязательно для заполнения')
+    elif len(name) < 2:
+        errors.append('Имя должно содержать хотя бы 2 символа')
+    
+    if not email:
+        errors.append('Email обязателен для заполнения')
+    elif User.query.filter_by(email=email).first():
+        errors.append('Пользователь с таким email уже существует')
+    
+    if not password:
+        errors.append('Пароль обязателен для заполнения')
+    elif len(password) < 6:
+        errors.append('Пароль должен содержать хотя бы 6 символов')
+    
+    if errors:
+        return jsonify({
+            'success': False,
+            'errors': errors
+        }), 400
+    
+    new_user = User(name=name, email=email)
+    new_user.set_password(password)
+    
+    db.session.add(new_user)
+    db.session.commit()
+    
+    # Эндпоинты возращающие токены
+    access_token = JWTManager.create_access_token(new_user.id, new_user.name)
+    refresh_token = JWTManager.create_refresh_token(new_user.id, new_user.name)
+    
+    new_user.add_refresh_token(refresh_token)
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Регистрация успешна',
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+        'token_type': 'bearer',
+        'expires_in': 900,
+        'user': {
+            'id': new_user.id,
+            'name': new_user.name,
+            'email': new_user.email
+        }
+    }), 201
+    
     
 if __name__ == '__main__':
     app.run(debug=True)

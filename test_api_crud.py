@@ -1,29 +1,19 @@
-import requests
-import json
-
-BASE_URL = "http://localhost:5000/api"
 
 
-# ===========================================================
+# регистрация через API с получением токена
+curl -X POST http://localhost:5000/auth/register -H "Content-Type: application/json" -d '{"name":"Test User","email":"test@example.com","password":"test123"}'
 
-4.1
-curl "http://localhost:5000/api/articles"
-curl "http://localhost:5000/api/articles/5"
+# вход того же пользователя
+curl -X POST http://localhost:5000/auth/login -H "Content-Type: application/json" -d '{"email":"test@example.com","password":"test123"}'
 
-4.2
-curl -X POST "http://localhost:5000/api/articles" -H "Content-Type: application/json" -d '{"title": "DEMO CREATE ARTICLE", "text": "JUST CREATED ARTICLE", "category": "technology"}'
-curl -X PUT "http://localhost:5000/api/articles/7" -H "Content-Type: application/json" -d '{"title": "UPDATED UPDATED UPDATED", "text": "ARTICLE IS UPDATED NOW"}'
-curl -X DELETE "http://localhost:5000/api/articles/7"
+# создание статьи с JWT токеном
+curl -X POST http://localhost:5000/api/articles -H "Content-Type: application/json" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJ1c2VybmFtZSI6IlRlc3QgVXNlciIsImV4cCI6MTc2ODI3NDMyOSwiaWF0IjoxNzY4MjczNDI5LCJ0eXBlIjoiYWNjZXNzIn0.R6Yr2NpUgUts6iWb8_7oTlgBbo-Po0ID3Uk60rev7ck" -d '{"title":"My First Protected Article","text":"This article was created using JWT authentication","category":"technology"}'
 
-4.3
-curl "http://localhost:5000/api/articles/category/technology"
-curl "http://localhost:5000/api/articles?category=technology"
-curl "http://localhost:5000/api/articles?sort=date"
-curl "http://localhost:5000/api/articles?category=technology&sort=date&limit=2"
+# получение нового токена
+curl -X POST http://localhost:5000/auth/refresh -H "Content-Type: application/json" -d '{"refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJ1c2VybmFtZSI6IlRlc3QgVXNlciIsImV4cCI6MTc2ODg3ODIyOSwiaWF0IjoxNzY4MjczNDI5LCJ0eXBlIjoicmVmcmVzaCJ9.T9E3SHtKrjknMYSfncPtHoU4olXe282IOkl4xi-xTHc"}'
 
+# выход из системы
+curl -X POST http://localhost:5000/auth/logout -H "Content-Type: application/json" -d '{"refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJ1c2VybmFtZSI6IlRlc3QgVXNlciIsImV4cCI6MTc2ODg3ODIyOSwiaWF0IjoxNzY4MjczNDI5LCJ0eXBlIjoicmVmcmVzaCJ9.T9E3SHtKrjknMYSfncPtHoU4olXe282IOkl4xi-xTHc"}'
 
-4.4
-curl "http://localhost:5000/api/comments"
-curl -X POST "http://localhost:5000/api/comments" -H "Content-Type: application/json" -d '{"text": "JUST CREATED COMMENT", "author_name": "bot", "article_id": 6}'
-curl "http://localhost:5000/api/comments/1"
-curl -X DELETE "http://localhost:5000/api/comments/1"
+# проверка без токена
+curl -X POST http://localhost:5000/api/articles -H "Content-Type: application/json" -d '{"title":"Test Without Token","text":"Should fail","category":"general"}'
